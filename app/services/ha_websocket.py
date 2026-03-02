@@ -583,6 +583,46 @@ class HAWebSocketClient:
         logger.info(f"Deleted area from registry: {area_id}")
         return result
     
+    # ==================== Exposed Entities ====================
+
+    async def list_exposed_entities(self) -> dict:
+        """
+        List entities exposed to voice assistants.
+
+        Uses the WebSocket command: homeassistant/expose_entity/list
+
+        Returns:
+            Dict mapping entity_id to assistant exposure status, e.g.:
+            {"light.kitchen": {"conversation": true, "cloud.alexa": false}}
+        """
+        result = await self._send_message({'type': 'homeassistant/expose_entity/list'})
+        return (result or {}).get('exposed_entities', result or {})
+
+    async def expose_entities(self, entity_ids: list, assistants: list, should_expose: bool) -> dict:
+        """
+        Expose or unexpose entities to voice assistants.
+
+        Uses the WebSocket command: homeassistant/expose_entity
+        Changes take effect immediately (no HA restart needed).
+
+        Args:
+            entity_ids: List of entity IDs to expose/unexpose
+            assistants: List of assistant names (e.g., ["conversation"], ["cloud.alexa"])
+            should_expose: True to expose, False to unexpose
+
+        Returns:
+            Operation result
+        """
+        result = await self._send_message({
+            'type': 'homeassistant/expose_entity',
+            'assistants': assistants,
+            'entity_ids': entity_ids,
+            'should_expose': should_expose,
+        })
+        action = "Exposed" if should_expose else "Unexposed"
+        logger.info(f"{action} {len(entity_ids)} entities to {assistants}")
+        return result
+
     # ==================== Device Registry ====================
     
     async def get_device_registry_list(self) -> list:

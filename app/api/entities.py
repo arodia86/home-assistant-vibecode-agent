@@ -249,6 +249,76 @@ async def call_service(
         logger.error(f"Failed to call service {domain}.{service}: {e}")
         raise HTTPException(status_code=500, detail=f"Service call failed: {str(e)}")
 
+@router.get("/exposed")
+async def list_exposed_entities(
+    assistant: str = Query("conversation", description="Assistant name: 'conversation', 'cloud.alexa', or 'cloud.google_assistant'"),
+):
+    """
+    List entities exposed to a voice assistant.
+
+    Uses the HA WebSocket command `homeassistant/expose_entity/list`.
+
+    **Examples:**
+    - `/api/entities/exposed` - entities exposed to Assist/Ollama (conversation)
+    - `/api/entities/exposed?assistant=cloud.alexa` - entities exposed to Alexa
+    """
+    try:
+        from app.services.ha_websocket import get_ws_client
+        ws_client = await get_ws_client()
+        all_exposed = await ws_client.list_exposed_entities()
+
+        exposed_ids = [
+            eid for eid, assistants in all_exposed.items()
+            if assistants.get(assistant) is True
+        ]
+
+        logger.info(f"Listed {len(exposed_ids)} entities exposed to {assistant}")
+        return {
+            "success": True,
+            "assistant": assistant,
+            "count": len(exposed_ids),
+            "entity_ids": sorted(exposed_ids),
+        }
+    except Exception as e:
+        logger.error(f"Failed to list exposed entities: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/expose")
+async def expose_entities(
+    entity_ids: List[str] = Body(..., description="List of entity IDs to expose or unexpose"),
+    should_expose: bool = Body(True, description="True to expose, False to unexpose"),
+    assistant: str = Body("conversation", description="Assistant name: 'conversation', 'cloud.alexa', or 'cloud.google_assistant'"),
+):
+    """
+    Expose or unexpose entities to a voice assistant.
+
+    Uses the HA WebSocket command `homeassistant/expose_entity`.
+    Changes take effect immediately (no HA restart needed).
+
+    **Examples:**
+    - Expose to Assist: `{"entity_ids": ["light.kitchen", "sensor.temp"], "should_expose": true}`
+    - Unexpose from Alexa: `{"entity_ids": ["light.kitchen"], "should_expose": false, "assistant": "cloud.alexa"}`
+    """
+    try:
+        from app.services.ha_websocket import get_ws_client
+        ws_client = await get_ws_client()
+        result = await ws_client.expose_entities(entity_ids, [assistant], should_expose)
+
+        action = "Exposed" if should_expose else "Unexposed"
+        logger.info(f"{action} {len(entity_ids)} entities to {assistant}")
+        return {
+            "success": True,
+            "action": action.lower(),
+            "assistant": assistant,
+            "count": len(entity_ids),
+            "entity_ids": entity_ids,
+        }
+    except Exception as e:
+        logger.error(f"Failed to expose/unexpose entities: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/rename")
 async def rename_entity(
     old_entity_id: str = Body(..., description="Current entity_id (e.g., 'climate.sonoff_trvzb_thermostat')"),
