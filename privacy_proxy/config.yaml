@@ -1,0 +1,59 @@
+name: HA Privacy Proxy
+description: >
+  Privacy sanitization layer for the HA Vibecode Agent.
+  Intercepts all traffic between the MCP client and the agent,
+  replacing PII (names, IPs, MAC addresses, GPS coordinates, emails)
+  with opaque tokens before the data reaches Claude.
+  Tokens are automatically restored in requests going back to the agent.
+version: 1.0.0
+slug: ha_privacy_proxy
+url: https://github.com/arodia86/home-assistant-vibecode-agent
+arch:
+  - amd64
+  - aarch64
+  - armv7
+init: false
+
+options:
+  proxy_port: 8098
+  agent_port: 8099
+  # Comma-separated first/last names or any words you always want redacted.
+  # Example: ["John", "Smith", "Flat 4", "MyDogFluffy"]
+  personal_names: []
+  # Additional words or phrases to redact beyond automatic patterns
+  custom_words: []
+  # Entity domains whose friendly names are auto-redacted (e.g. person, input_text)
+  entity_domains:
+    - person
+  redact_ips: true
+  redact_macs: true
+  redact_emails: true
+  redact_phones: false
+  redact_gps: true
+  log_level: info
+
+schema:
+  proxy_port: int
+  agent_port: int
+  personal_names:
+    - str
+  custom_words:
+    - str
+  entity_domains:
+    - str
+  redact_ips: bool
+  redact_macs: bool
+  redact_emails: bool
+  redact_phones: bool
+  redact_gps: bool
+  log_level: list(trace|debug|info|notice|warning|error|fatal)
+
+ports:
+  8098/tcp: 8098
+
+ports_description:
+  8098/tcp: Privacy Proxy – MCP clients connect here instead of the agent
+
+map:
+  - config:rw
+  - data:rw
